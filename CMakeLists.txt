@@ -11,7 +11,9 @@ add_definitions(${GTKMM3_CFLAGS_OTHER})
 
 set(SRC src/main.cpp
         src/window.h
-        src/window.cpp)
+        src/window.cpp
+        src/clock_widget.h
+        src/clock_widget.cpp)
 add_executable(${PROJECT_NAME} ${SRC})
 
 target_link_libraries(${PROJECT_NAME} ${GTKMM3_LIBRARIES})

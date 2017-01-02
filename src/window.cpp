@@ -2,11 +2,12 @@
 
 namespace AnalogClock {
 
-Window::Window() {
-    Gtk::Window();
-
+Window::Window() :
+    Gtk::Window()
+{
     set_title("Main window");
-    set_default_size(800, 600);
+    add(clockWidget);
+    show_all();
 }
 
 }
