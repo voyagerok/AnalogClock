@@ -1,4 +1,5 @@
 #include "clock_widget.h"
+#include <iostream>
 
 namespace AnalogClock {
 
@@ -12,6 +13,16 @@ ClockWidget::ClockWidget() :
     Gtk::Widget()
 {
     set_has_window(true);
+    timer_render_time = Glib::signal_timeout().connect([this] {
+        auto win = get_window();
+        if (win)
+        {
+            Gdk::Rectangle r(0, 0, get_allocation().get_width(),
+                    get_allocation().get_height());
+            win->invalidate_rect(r, false);
+        }
+        return true;
+    }, 1000);
 }
 
 Gtk::SizeRequestMode ClockWidget::get_request_mode_vfunc() const
@@ -94,12 +105,124 @@ void ClockWidget::on_unrealize()
     Gtk::Widget::on_unrealize();
 }
 
+Cairo::RefPtr<Cairo::Surface> ClockWidget::render_clock()
+{
+    auto alloc = get_allocation();
+    int width = alloc.get_width();
+    int height = alloc.get_height();
+
+    auto surface = Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, alloc.get_width(),
+                                               alloc.get_height());
+
+    auto ctx = Cairo::Context::create(surface);
+
+    ctx->scale(width / 100.0, height / 100.0);
+
+    ctx->rectangle(0, 0, 100, 100);
+    ctx->set_source_rgba(0.75, 0.75, 0.75, 1);
+    ctx->fill();
+
+    ctx->arc(50, 50, 50, 0, 2 * M_PI);
+    ctx->set_source_rgba(0.55, 0.55, 0.55, 1);
+    ctx->fill();
+
+    ctx->set_source_rgb(0, 0, 0);
+    ctx->set_line_width(1);
+    for (int i = 0; i < 60; ++i)
+    {
+        ctx->move_to(50, 0);
+        if (i % 5 == 0)
+        {
+            ctx->line_to(50, 4);
+        }
+        else
+        {
+            ctx->line_to(50, 2);
+        }
+        ctx->stroke();
+        ctx->translate(50, 50);
+        ctx->rotate_degrees(6);
+        ctx->translate(-50, -50);
+    }
+
+    return surface;
+}
+
+Cairo::RefPtr<Cairo::Surface> ClockWidget::render_time(int seconds, int minutes, int hours)
+{
+    auto alloc = get_allocation();
+    int width = alloc.get_width();
+    int height = alloc.get_height();
+
+    auto surface = Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, width, height);
+    auto context = Cairo::Context::create(surface);
+
+    context->scale(width / 100.0, height / 100.0);
+
+    context->set_source_rgba(0,0,0,0);
+    context->paint();
+
+    auto hours_angle = (hours % 12) * 30;
+    if (minutes != 0 || seconds != 0)
+    {
+        auto overall_seconds = minutes * 60 + seconds;
+        hours_angle += (30 / 3600.0) * overall_seconds;
+    }
+    auto minutes_angle = minutes * 6;
+    if (seconds != 0)
+    {
+        minutes_angle += (6 / 60.0) * seconds;
+    }
+    auto seconds_angle = seconds * 6;
+
+
+    context->set_source_rgb(0, 0, 0);
+    context->set_line_width(3);
+    context->save();
+    context->translate(50, 50);
+    context->rotate_degrees(hours_angle);
+    context->translate(-50, -50);
+    context->move_to(50,50);
+    context->line_to(50, 10);
+    context->stroke();
+
+    context->restore();
+    context->set_line_width(2);
+    context->save();
+    context->translate(50, 50);
+    context->rotate_degrees(minutes_angle);
+    context->translate(-50, -50);
+    context->move_to(50,50);
+    context->line_to(50, 10);
+    context->stroke();
+
+    context->restore();
+    context->set_line_width(1);
+    context->translate(50, 50);
+    context->rotate_degrees(seconds_angle);
+    context->translate(-50, -50);
+    context->move_to(50,50);
+    context->line_to(50, 10);
+    context->stroke();
+
+    return  surface;
+}
+
+void ClockWidget::set_time(int seconds, int minutes, int hours)
+{
+
+}
+
 bool ClockWidget::on_draw(const Cairo::RefPtr<Cairo::Context> &cr)
 {
-    Gtk::Allocation alloc = get_allocation();
-    cr->rectangle(alloc.get_x(),alloc.get_y(), alloc.get_width(), alloc.get_height());
-    cr->set_source_rgb(0,0,0);
-    cr->fill();
+    auto surface = render_clock();
+    cr->set_source(surface, 0, 0);
+    cr->paint();
+
+    auto date = Glib::DateTime::create_now_local();
+    surface = render_time(date.get_second(), date.get_minute(), date.get_hour());
+    cr->set_source(surface, 0, 0);
+    cr->paint();
 
     return true;
 }
