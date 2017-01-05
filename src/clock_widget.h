@@ -23,6 +23,7 @@ private:
 
     Cairo::RefPtr<Cairo::Surface> render_clock();
     Cairo::RefPtr<Cairo::Surface> render_time(int, int, int);
+    Cairo::RefPtr<Cairo::Surface> render_time_labels();
 
     sigc::connection timer_render_time;
     sigc::slot<bool> render_time_slot;

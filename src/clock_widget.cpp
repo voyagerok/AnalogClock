@@ -1,5 +1,7 @@
 #include "clock_widget.h"
 #include <iostream>
+#include "logger.h"
+#include <boost/format.hpp>
 
 namespace AnalogClock {
 
@@ -14,13 +16,13 @@ ClockWidget::ClockWidget() :
 {
     set_has_window(true);
     timer_render_time = Glib::signal_timeout().connect([this] {
-        auto win = get_window();
-        if (win)
-        {
-            Gdk::Rectangle r(0, 0, get_allocation().get_width(),
-                    get_allocation().get_height());
-            win->invalidate_rect(r, false);
-        }
+//        auto win = get_window();
+//        if (win)
+//        {
+//            Gdk::Rectangle r(0, 0, get_allocation().get_width(),
+//                    get_allocation().get_height());
+//            win->invalidate_rect(r, false);
+//        }
         return true;
     }, 1000);
 }
@@ -208,6 +210,58 @@ Cairo::RefPtr<Cairo::Surface> ClockWidget::render_time(int seconds, int minutes,
     return  surface;
 }
 
+typedef struct point {
+    int x,y;
+} point;
+
+static point translate(point p, int dx, int dy)
+{
+    return  {p.x + dx, p.y + dy};
+}
+
+static point rotate(point p, double angle)
+{
+    double rad_angle = angle * M_PI / 180;
+    point result;
+    result.x = p.x * cos(rad_angle) - p.y * sin(rad_angle);
+    result.y = p.x * sin(rad_angle) + p.y * cos(rad_angle);
+    return result;
+}
+
+Cairo::RefPtr<Cairo::Surface> ClockWidget::render_time_labels()
+{
+    auto alloc = get_allocation();
+    int width = alloc.get_width();
+    int height = alloc.get_height();
+
+    auto surface = Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, width, height);
+    auto context = Cairo::Context::create(surface);
+
+    context->scale(width / 100.0, height / 100.0);
+
+    context->set_source_rgba(0,0,0,0);
+    context->paint();
+
+    context->set_font_size(3);
+    context->set_source_rgb(0,0,0);
+    context->move_to(50, 7);
+    point start_point = {50 ,7};
+    for (int i = 0; i < 12; ++i)
+    {
+        context->show_text(std::to_string(i == 0 ? 12 : i));
+        context->stroke();
+        point cur_point = translate(start_point, -50, -50);
+        cur_point = rotate(cur_point, 30 * (i + 1));
+        cur_point = translate(cur_point, 50, 50);
+        context->move_to(cur_point.x, cur_point.y);
+
+        auto fmt = boost::format("current points: x - %1%, y - %2%") % cur_point.x % cur_point.y;
+        Logger::WriteLog(fmt.str());
+    }
+
+    return surface;
+}
+
 void ClockWidget::set_time(int seconds, int minutes, int hours)
 {
 
@@ -221,6 +275,10 @@ bool ClockWidget::on_draw(const Cairo::RefPtr<Cairo::Context> &cr)
 
     auto date = Glib::DateTime::create_now_local();
     surface = render_time(date.get_second(), date.get_minute(), date.get_hour());
+    cr->set_source(surface, 0, 0);
+    cr->paint();
+
+    surface = render_time_labels();
     cr->set_source(surface, 0, 0);
     cr->paint();
 
