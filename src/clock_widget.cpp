@@ -16,13 +16,13 @@ ClockWidget::ClockWidget() :
 {
     set_has_window(true);
     timer_render_time = Glib::signal_timeout().connect([this] {
-//        auto win = get_window();
-//        if (win)
-//        {
-//            Gdk::Rectangle r(0, 0, get_allocation().get_width(),
-//                    get_allocation().get_height());
-//            win->invalidate_rect(r, false);
-//        }
+        auto win = get_window();
+        if (win)
+        {
+            Gdk::Rectangle r(0, 0, get_allocation().get_width(),
+                    get_allocation().get_height());
+            win->invalidate_rect(r, false);
+        }
         return true;
     }, 1000);
 }
@@ -142,6 +142,11 @@ Cairo::RefPtr<Cairo::Surface> ClockWidget::render_clock()
             ctx->line_to(50, 2);
         }
         ctx->stroke();
+
+//        ctx->move_to(50, 7);
+//        ctx->rel_line_to(1,0);
+//        ctx->stroke();
+
         ctx->translate(50, 50);
         ctx->rotate_degrees(6);
         ctx->translate(-50, -50);
@@ -210,24 +215,6 @@ Cairo::RefPtr<Cairo::Surface> ClockWidget::render_time(int seconds, int minutes,
     return  surface;
 }
 
-typedef struct point {
-    int x,y;
-} point;
-
-static point translate(point p, int dx, int dy)
-{
-    return  {p.x + dx, p.y + dy};
-}
-
-static point rotate(point p, double angle)
-{
-    double rad_angle = angle * M_PI / 180;
-    point result;
-    result.x = p.x * cos(rad_angle) - p.y * sin(rad_angle);
-    result.y = p.x * sin(rad_angle) + p.y * cos(rad_angle);
-    return result;
-}
-
 Cairo::RefPtr<Cairo::Surface> ClockWidget::render_time_labels()
 {
     auto alloc = get_allocation();
@@ -244,19 +231,35 @@ Cairo::RefPtr<Cairo::Surface> ClockWidget::render_time_labels()
 
     context->set_font_size(3);
     context->set_source_rgb(0,0,0);
-    context->move_to(50, 7);
-    point start_point = {50 ,7};
+    context->set_line_width(1);
+
+    double x, y;
     for (int i = 0; i < 12; ++i)
     {
+        context->save();
+
+        context->translate(50,50);
+        context->rotate(i * M_PI / 6);
+        context->translate(-50,-50);
+
+        x = 50, y = 7;
+        context->user_to_device(x, y);
+        if (i / 10 > 0 || i == 0)
+        {
+            x = x / (width / 100.0) - 1.5;
+            y = y / (height / 100.0) + 0.5;
+        }
+        else
+        {
+            x = x / (width / 100.0) - 0.8;
+            y = y / (height / 100.0) + 0.5;
+        }
+
+        context->restore();
+
+        context->move_to(x, y);
         context->show_text(std::to_string(i == 0 ? 12 : i));
         context->stroke();
-        point cur_point = translate(start_point, -50, -50);
-        cur_point = rotate(cur_point, 30 * (i + 1));
-        cur_point = translate(cur_point, 50, 50);
-        context->move_to(cur_point.x, cur_point.y);
-
-        auto fmt = boost::format("current points: x - %1%, y - %2%") % cur_point.x % cur_point.y;
-        Logger::WriteLog(fmt.str());
     }
 
     return surface;
